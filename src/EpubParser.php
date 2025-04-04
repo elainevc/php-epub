@@ -144,15 +144,31 @@ class EpubParser {
     private function _getOPF() {
         $file = "META-INF".$this->directorySeparator."container.xml";
         $buf = $this->_getFileContentFromZipArchive($file);
-        $opfContents = simplexml_load_string($buf);
+        
+        $opfContents = @simplexml_load_string($buf);
+        if ($opfContents === false) {
+            throw new \Exception("Failed to parse container.xml");
+        }
+    
+        if (!isset($opfContents->rootfiles) || !isset($opfContents->rootfiles->rootfile)) {
+            throw new \Exception("Invalid container.xml structure - missing rootfiles");
+        }
+    
         $opfAttributes = $opfContents->rootfiles->rootfile->attributes();
-        $this->opfFile = (string) $opfAttributes->{'full-path'}; // Typecasting to string to get rid of the XML object
-
-        // Set also the dir to the OPF (and ePub files)
-        $opfDirParts = explode($this->directorySeparator,$this->opfFile);
-        unset($opfDirParts[(count($opfDirParts)-1)]); // remove the last part (it's the .opf file itself)
-        $this->opfDir = implode($this->directorySeparator, $opfDirParts);
-
+        if ($opfAttributes === null) {
+            throw new \Exception("No attributes found in rootfile");
+        }
+    
+        $this->opfFile = (string) $opfAttributes->{'full-path'};
+        
+        $opfDirParts = explode($this->directorySeparator, $this->opfFile);
+        if (count($opfDirParts) > 1) {
+            unset($opfDirParts[count($opfDirParts)-1]);
+            $this->opfDir = implode($this->directorySeparator, $opfDirParts);
+        } else {
+            $this->opfDir = '';
+        }
+    
         return $this->opfFile;
     }
 
