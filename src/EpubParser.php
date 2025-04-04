@@ -207,14 +207,29 @@ class EpubParser {
      */
     private function _getManifest() {
         $buf = $this->_getFileContentFromZipArchive($this->opfFile);
-        $opfContents = simplexml_load_string($buf);
-        $iManifest = 0;
-        foreach ($opfContents->manifest->item AS $item) {
+        $opfContents = @simplexml_load_string($buf);
+        
+        if ($opfContents === false || !isset($opfContents->manifest)) {
+            $this->manifest = [];
+            return;
+        }
+    
+        foreach ($opfContents->manifest->item as $item) {
             $attr = $item->attributes();
-            $id = (string) $attr->id;
-            $this->manifest[$id]['href'] = Util::directoryConcat($this->opfDir, urldecode((string) $attr->href));
-            $this->manifest[$id]['media-type'] = (string) $attr->{'media-type'};
-            $iManifest++;
+            if ($attr === null) continue;
+            
+            $id = (string) ($attr->id ?? '');
+            if ($id === '') continue;
+            
+            $href = (string) ($attr->href ?? '');
+            $mediaType = (string) ($attr->{'media-type'} ?? '');
+            
+            if ($href !== '') {
+                $this->manifest[$id] = [
+                    'href' => Util::directoryConcat($this->opfDir, urldecode($href)),
+                    'media-type' => $mediaType
+                ];
+            }
         }
     }
 
