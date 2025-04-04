@@ -249,7 +249,7 @@ class EpubParser {
         $this->spine = [];
     
         // Check if spine exists and has itemref elements
-        if (!isset($opfContents->spine) {
+        if (!isset($opfContents->spine)) {
             error_log("Warning: No spine found in OPF file");
             return;
         }
