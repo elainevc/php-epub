@@ -208,35 +208,51 @@ class EpubParser {
      */
     private function _getTOC() {
         $tocFile = $this->getManifest('ncx');
-        $buf = $this->_getFileContentFromZipArchive($tocFile['href']);
-        $tocContents = simplexml_load_string($buf);
-
-        $callback = function($navPoints) use(& $callback) {
-            $ret = [];
-            foreach ($navPoints as $navPoint) {
-                $attributes = $navPoint->attributes();
-                // $payOrder = (string) $attributes['playOrder'];
-                $src = Util::directoryConcat($this->opfDir, (string) $navPoint->content->attributes());
-                $explodeUrl = strpos($src, "#") ? explode("#", $src) : [$src, null];
-                $current = [
-                    'id' => (string) $attributes['id'],
-                    'name' => (string) $navPoint->navLabel->text,
-                    'file_name' => $explodeUrl[0],
-                    'src'  => $src,
-                    'page_id' => $explodeUrl[1]
-                ];
-
-                if (isset($navPoint->navPoint) && !empty($navPoint->navPoint)) {
-                    $current['children'] = $callback($navPoint->navPoint);
-                }
-                $ret[] = $current;
+        if ($tocFile === false) {
+            // Try alternative ways to find the TOC file
+            $tocFiles = $this->getManifestByType('application/x-dtbncx+xml');
+            if ($tocFiles === false || empty($tocFiles)) {
+                $this->toc = [];
+                return;
             }
-            return $ret;
-        };
-
-        $toc = $callback($tocContents->navMap->navPoint);
-
-        $this->toc = $toc;
+            $tocFile = reset($tocFiles); // Get first TOC file found
+        }
+    
+        try {
+            $buf = $this->_getFileContentFromZipArchive($tocFile['href']);
+            $tocContents = simplexml_load_string($buf);
+            if ($tocContents === false) {
+                throw new \Exception('Failed to parse TOC XML');
+            }
+    
+            $callback = function($navPoints) use(& $callback) {
+                $ret = [];
+                foreach ($navPoints as $navPoint) {
+                    $attributes = $navPoint->attributes();
+                    $src = Util::directoryConcat($this->opfDir, (string) $navPoint->content->attributes());
+                    $explodeUrl = strpos($src, "#") ? explode("#", $src) : [$src, null];
+                    $current = [
+                        'id' => (string) $attributes['id'],
+                        'name' => (string) $navPoint->navLabel->text,
+                        'file_name' => $explodeUrl[0],
+                        'src'  => $src,
+                        'page_id' => $explodeUrl[1]
+                    ];
+    
+                    if (isset($navPoint->navPoint) && !empty($navPoint->navPoint)) {
+                        $current['children'] = $callback($navPoint->navPoint);
+                    }
+                    $ret[] = $current;
+                }
+                return $ret;
+            };
+    
+            $toc = $callback($tocContents->navMap->navPoint);
+            $this->toc = $toc;
+        } catch (\Exception $e) {
+            error_log("Error parsing TOC: " . $e->getMessage());
+            $this->toc = [];
+        }
     }
 
     /**
