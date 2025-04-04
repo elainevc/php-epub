@@ -239,10 +239,29 @@ class EpubParser {
      */
     private function _getSpine() {
         $buf = $this->_getFileContentFromZipArchive($this->opfFile);
-        $opfContents = simplexml_load_string($buf);
-        foreach ($opfContents->spine->itemref AS $item) {
-            $attr = $item->attributes();
-            $this->spine[] = (string) $attr->idref;
+        $opfContents = @simplexml_load_string($buf);
+        
+        if ($opfContents === false) {
+            throw new \Exception("Failed to parse OPF file");
+        }
+    
+        // Initialize empty spine array
+        $this->spine = [];
+    
+        // Check if spine exists and has itemref elements
+        if (!isset($opfContents->spine) {
+            error_log("Warning: No spine found in OPF file");
+            return;
+        }
+    
+        // Safely iterate through itemref elements
+        if (isset($opfContents->spine->itemref)) {
+            foreach ($opfContents->spine->itemref as $item) {
+                $attr = $item->attributes();
+                if ($attr !== null && isset($attr->idref)) {
+                    $this->spine[] = (string)$attr->idref;
+                }
+            }
         }
     }
 
